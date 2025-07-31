@@ -23,7 +23,7 @@ const users = [
 ];
 
 // Handler principale per Vercel
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Configura CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -34,12 +34,17 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { url, method } = req;
+  const { method } = req;
+  const url = req.url || '';
   
   try {
     // Route per login
-    if (url === '/api/auth/login' && method === 'POST') {
+    if (url.includes('/api/auth/login') && method === 'POST') {
       const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email e password sono richiesti' });
+      }
       
       const user = users.find(u => u.email === email);
       if (!user) {
@@ -57,7 +62,7 @@ export default async function handler(req, res) {
         { expiresIn: '24h' }
       );
       
-      return res.json({
+      return res.status(200).json({
         token,
         user: {
           id: user.id,
@@ -69,8 +74,12 @@ export default async function handler(req, res) {
     }
     
     // Route per registrazione
-    if (url === '/api/auth/register' && method === 'POST') {
+    if (url.includes('/api/auth/register') && method === 'POST') {
       const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email e password sono richiesti' });
+      }
       
       const existingUser = users.find(u => u.email === email);
       if (existingUser) {
@@ -94,7 +103,7 @@ export default async function handler(req, res) {
         { expiresIn: '24h' }
       );
       
-      return res.json({
+      return res.status(200).json({
         token,
         user: {
           id: newUser.id,
@@ -106,15 +115,15 @@ export default async function handler(req, res) {
     }
     
     // Route per health check
-    if (url === '/api/health' && method === 'GET') {
-      return res.json({ status: 'OK', timestamp: new Date().toISOString() });
+    if (url.includes('/api/health') && method === 'GET') {
+      return res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
     }
     
     // Route non trovata
-    res.status(404).json({ error: 'Route not found' });
+    return res.status(404).json({ error: 'Route not found' });
     
   } catch (error) {
     console.error('API Error:', error);
-    res.status(500).json({ error: 'Errore del server' });
+    return res.status(500).json({ error: 'Errore del server', details: error.message });
   }
-}
+};
