@@ -1,18 +1,40 @@
 {
-  "name": "vertex-unified",
-  "version": "1.0.0",
+  "name": "vertex",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "cd vertex && npm run dev",
-    "build": "cd vertex && npm run build",
-    "start": "cd vertex && npm run preview"
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.53.0",
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^17.0.1",
-    "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2"
+    "@headlessui/react": "^2.2.4",
+    "@heroicons/react": "^2.2.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "autoprefixer": "^10.4.21",
+    "framer-motion": "^12.23.12",
+    "i18next": "^25.3.0",
+    "i18next-browser-languagedetector": "^8.2.0",
+    "i18next-http-backend": "^3.0.2",
+    "jwt-decode": "^4.0.0",
+    "postcss": "^8.4.31",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-i18next": "^15.6.1",
+    "react-router-dom": "^7.7.1",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.0.0",
+    "vite-plugin-pwa": "^1.0.1",
+    "workbox-window": "^7.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.29.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "eslint": "^9.29.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.2.0"
   }
 }

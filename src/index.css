@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Manrope', 'Inter', system-ui, sans-serif;
+    /* Prevent zoom on input focus on iOS */
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  body {
+    @apply bg-slate-900 text-white min-h-screen;
+    /* Prevent horizontal scroll */
+    overflow-x: hidden;
+  }
+  
+  /* Mobile viewport optimization */
+  @media screen and (max-width: 768px) {
+    html {
+      font-size: 14px;
+    }
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-slate-800 rounded-2xl shadow-md p-4;
+    /* Mobile optimizations */
+    @apply transition-all duration-200;
+  }
+  
+  .card-mobile {
+    @apply card p-3 mx-2 mb-3;
+  }
+  
+  .btn-primary {
+    @apply bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-2xl transition-all;
+    /* Mobile touch optimization */
+    @apply min-h-[44px] active:scale-95;
+  }
+  
+  .btn-secondary {
+    @apply bg-violet-500 hover:bg-violet-600 text-white font-medium py-3 px-6 rounded-2xl transition-all;
+    @apply min-h-[44px] active:scale-95;
+  }
+  
+  .input {
+    @apply bg-slate-800 border border-gray-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500;
+    /* Mobile input optimization */
+    @apply min-h-[44px] text-base;
+  }
+  
+  /* Mobile-specific utilities */
+  .mobile-container {
+    @apply px-4 py-2 max-w-full;
+  }
+  
+  .mobile-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4;
+  }
+  
+  .mobile-safe-area {
+    @apply pb-20 md:pb-4;
+  }
+}
+
+/* Touch optimizations */
+button, .btn, [role="button"] {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: static !important;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+  /* Improve touch targets */
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
+
+/* Prevent text selection on buttons */
+button {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Mobile scroll optimization */
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
