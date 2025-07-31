@@ -26,6 +26,7 @@ const RegisterPage = () => {
     setError(''); // Clear error when user types
   };
 
+  // Modifica la gestione del reindirizzamento
   const handleRegister = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -48,8 +49,10 @@ const RegisterPage = () => {
     const result = await register(formData.email, formData.password);
     
     if (result.success) {
-      // Redirect to dashboard after successful registration
-      navigate('/dashboard', { replace: true });
+      // Aggiungi un breve ritardo per dare tempo alla sessione di essere impostata
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 500);
     } else {
       setError(result.error);
     }

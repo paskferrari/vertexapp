@@ -5,9 +5,12 @@ import { useAuth } from '../context/AuthContext';
  * PrivateRoute component for protecting routes that require authentication
  * Redirects to login page if user is not authenticated
  */
+// Aggiungi un console.log per debug
 const PrivateRoute = () => {
   const { user, loading } = useAuth();
-
+  
+  console.log('PrivateRoute - user:', user, 'loading:', loading);
+  
   // Show loading spinner while checking authentication
   if (loading) {
     return (

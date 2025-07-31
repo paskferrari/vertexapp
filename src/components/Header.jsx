@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import LanguageSwitcher from './LanguageSwitcher';
 
-const Header = () => {
+// Nel componente Header.jsx, assicurati che onLogout sia definito correttamente
+const Header = ({ user, onLogout }) => {  // Assicurati che onLogout sia passato come prop
   const location = useLocation();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);

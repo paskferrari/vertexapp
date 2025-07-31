@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../utils/supabase';
 
 const AuthContext = createContext();
 
@@ -14,88 +15,74 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const API_BASE_URL = import.meta.env.PROD 
-    ? import.meta.env.VITE_API_BASE_URL || '/api'
-    : '/api';
-    
-  console.log('API_BASE_URL:', API_BASE_URL);
-  console.log('Environment:', import.meta.env.PROD ? 'PRODUCTION' : 'DEVELOPMENT');
-
   useEffect(() => {
-    // Check for existing token on app load
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    // Controlla la sessione attuale di Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email,
+            role: session.user.user_metadata.role || 'user',
+            name: session.user.user_metadata.name || session.user.email.split('@')[0]
+          });
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
       }
-    }
-    
-    setLoading(false);
+    );
+
+    // Controlla se c'è già una sessione attiva
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email,
+          role: session.user.user_metadata.role || 'user',
+          name: session.user.user_metadata.name || session.user.email.split('@')[0]
+        });
+      }
+      setLoading(false);
+    };
+
+    checkUser();
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
-  const login = async (email, password, retries = 2) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
+  const login = async (email, password) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ email, password }),
-        signal: controller.signal,
-        credentials: 'include',
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
+      if (error) throw error;
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Credenziali non valide');
-      }
-
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      setUser(data.user);
-
-      return { success: true };
-      
+      return { success: true, user: data.user };
     } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if ((error.name === 'AbortError' || error.name === 'TypeError' || error.message.includes('Failed to fetch')) && retries > 0) {
-        console.log(`Login failed, retrying... (${retries} attempts left)`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return login(email, password, retries - 1);
-      }
-      
+      console.error('Login error:', error);
       let errorMessage = error.message;
       
-      if (error.name === 'AbortError') {
-        errorMessage = 'Login scaduto. Controlla la tua connessione internet e riprova.';
-      } else if (error.message.includes('Failed to fetch')) {
-        errorMessage = 'Impossibile connettersi al server. Verifica la tua connessione internet.';
-      } else if (error.message.includes('NetworkError')) {
-        errorMessage = 'Errore di rete. Controlla la tua connessione e riprova.';
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = 'Credenziali non valide';
+      } else if (error.message.includes('Email not confirmed')) {
+        errorMessage = 'Email non confermata. Controlla la tua casella di posta.';
       }
       
       return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
   };
 
@@ -104,35 +91,53 @@ export const AuthProvider = ({ children }) => {
   };
 
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return {}; // Supabase gestisce automaticamente i token nelle richieste
   };
 
+  // Dopo la registrazione, assicurati che la sessione sia impostata correttamente
   const register = async (email, password) => {
     try {
       setLoading(true);
       
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+      // Registrazione con Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            role: 'user',
+            name: email.split('@')[0]
+          }
+        }
       });
   
-      const data = await response.json();
-  
-      if (response.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setUser(data.user);
-        return { success: true, user: data.user };
-      } else {
-        return { success: false, error: data.error || 'Errore durante la registrazione' };
+      if (error) throw error;
+      
+      // Verifica se c'è una sessione e imposta l'utente
+      if (data.session) {
+        // Imposta esplicitamente l'utente qui per assicurarti che sia disponibile subito
+        setUser({
+          id: data.user.id,
+          email: data.user.email,
+          role: data.user.user_metadata.role || 'user',
+          name: data.user.user_metadata.name || data.user.email.split('@')[0]
+        });
       }
+      
+      return { 
+        success: true, 
+        user: data.user,
+        message: data.session ? 'Registrazione completata' : 'Controlla la tua email per verificare l\'account'
+      };
     } catch (error) {
       console.error('Registration error:', error);
-      return { success: false, error: 'Impossibile connettersi al server. Verifica la tua connessione internet.' };
+      let errorMessage = error.message;
+      
+      if (error.message.includes('already registered')) {
+        errorMessage = 'Email già registrata';
+      }
+      
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
@@ -142,7 +147,7 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
-    register, // Add register function
+    register,
     logout,
     isAdmin,
     getAuthHeaders
