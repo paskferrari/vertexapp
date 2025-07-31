@@ -4,17 +4,17 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 
-// Register service worker for PWA
-import { registerSW } from 'virtual:pwa-register'
+// Commenta o rimuovi queste righe relative al PWA
+// import { registerSW } from 'virtual:pwa-register'
 
 // Auto update service worker
-const updateSW = registerSW({
-  onNeedRefresh() {
-    if (confirm('New content available. Reload?')) {
-      updateSW(true)
-    }
-  },
-})
+// const updateSW = registerSW({
+//   onNeedRefresh() {
+//     if (confirm('New content available. Reload?')) {
+//       updateSW(true)
+//     }
+//   },
+// })
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
