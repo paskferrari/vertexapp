@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 
 const Layout = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();  // Rimuovi logout da qui
   const {
     selectedTips,
     isSlipOpen,
@@ -19,10 +19,7 @@ const Layout = () => {
     placeBet
   } = useBettingSlip();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  // Rimuovi handleLogout da qui
 
   if (!user) {
     return (
@@ -34,7 +31,7 @@ const Layout = () => {
 
   return (
     <div className="min-h-screen bg-dark text-white relative">
-      <Header user={user} onLogout={handleLogout} />
+      <Header />  {/* Rimuovi le props user e onLogout */}
       
       <main className="mobile-safe-area">
         <Outlet context={{ addTip, selectedTips }} />

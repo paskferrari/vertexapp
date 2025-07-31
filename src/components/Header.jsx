@@ -5,8 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import LanguageSwitcher from './LanguageSwitcher';
 
-// Nel componente Header.jsx, assicurati che onLogout sia definito correttamente
-const Header = ({ user, onLogout }) => {  // Assicurati che onLogout sia passato come prop
+const Header = () => {  // Rimuovi le props user e onLogout
   const location = useLocation();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -81,7 +80,7 @@ const Header = ({ user, onLogout }) => {  // Assicurati che onLogout sia passato
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-300">{t('common.welcome', { name: user?.name || 'User' })}</span>
             <button 
-              onClick={onLogout}
+              onClick={handleLogout}  // Usa handleLogout invece di onLogout
               className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               {t('common.logout')}
