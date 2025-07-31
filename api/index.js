@@ -1,9 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+const bcrypt = require('bcryptjs');
 
 const app = express();
 
@@ -11,207 +9,163 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Configurazione Supabase
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('❌ Variabili d\'ambiente Supabase mancanti');
-  process.exit(1);
-}
+// In-memory user storage (in produzione usare un database)
+const users = [
+  {
+    id: 1,
+    email: 'admin@vertex.com',
+    password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password: admin123
+    role: 'admin',
+    name: 'Admin User'
+  },
+  {
+    id: 2,
+    email: 'user@vertex.com',
+    password: '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', // password: user123
+    role: 'user',
+    name: 'Regular User'
+  }
+];
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-// Middleware per autenticazione JWT
+// Auth middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Token di accesso richiesto' });
+    return res.status(401).json({ error: 'Access token required' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({ error: 'Token non valido' });
+      return res.status(403).json({ error: 'Invalid or expired token' });
     }
     req.user = user;
     next();
   });
 };
 
-// Endpoint di registrazione
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email e password sono richiesti' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'La password deve essere di almeno 6 caratteri' });
-    }
-
-    // Controlla se l'utente esiste già
-    const { data: existingUser, error: checkError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
-
-    if (existingUser) {
-      return res.status(400).json({ error: 'Utente già esistente' });
-    }
-
-    // Hash della password
-    const hashedPassword = await bcryptjs.hash(password, 10);
-
-    // Crea nuovo utente
-    const { data: newUser, error: insertError } = await supabase
-      .from('users')
-      .insert([
-        {
-          email,
-          password: hashedPassword,
-          role: 'user'
-        }
-      ])
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Errore inserimento utente:', insertError);
-      return res.status(500).json({ error: 'Errore durante la registrazione' });
-    }
-
-    // Genera JWT token
-    const token = jwt.sign(
-      { userId: newUser.id, email: newUser.email, role: newUser.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.status(201).json({
-      message: 'Utente creato con successo',
-      token,
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        role: newUser.role
-      }
-    });
-  } catch (error) {
-    console.error('Errore registrazione:', error);
-    res.status(500).json({ error: 'Errore interno del server' });
-  }
-});
-
-// Endpoint di login
+// Auth routes
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email e password sono richiesti' });
-    }
-
-    // Trova l'utente
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, email, password, role')
-      .eq('email', email)
-      .single();
-
-    if (userError || !user) {
+    
+    const user = users.find(u => u.email === email);
+    if (!user) {
       return res.status(401).json({ error: 'Credenziali non valide' });
     }
-
-    // Verifica password
-    const isValidPassword = await bcryptjs.compare(password, user.password);
-    if (!isValidPassword) {
+    
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
       return res.status(401).json({ error: 'Credenziali non valide' });
     }
-
-    // Genera JWT token
+    
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
+      { id: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
       { expiresIn: '24h' }
     );
-
+    
     res.json({
-      message: 'Login effettuato con successo',
       token,
       user: {
         id: user.id,
         email: user.email,
+        name: user.name,
         role: user.role
       }
     });
   } catch (error) {
-    console.error('Errore login:', error);
-    res.status(500).json({ error: 'Errore interno del server' });
+    res.status(500).json({ error: 'Errore del server' });
   }
 });
 
-// Endpoint per ottenere le predizioni
-app.get('/api/predictions', async (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
-    const { data: predictions, error } = await supabase
-      .from('predictions')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Errore recupero predizioni:', error);
-      return res.status(500).json({ error: 'Errore recupero predizioni' });
+    const { email, password } = req.body;
+    
+    const existingUser = users.find(u => u.email === email);
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email già registrata' });
     }
-
-    res.json(predictions);
+    
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = {
+      id: users.length + 1,
+      email,
+      password: hashedPassword,
+      role: 'user',
+      name: email.split('@')[0]
+    };
+    
+    users.push(newUser);
+    
+    const token = jwt.sign(
+      { id: newUser.id, email: newUser.email, role: newUser.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.json({
+      token,
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role
+      }
+    });
   } catch (error) {
-    console.error('Errore:', error);
-    res.status(500).json({ error: 'Errore interno del server' });
+    res.status(500).json({ error: 'Errore del server' });
   }
 });
 
-// Endpoint per creare una predizione (solo admin)
-app.post('/api/predictions', authenticateToken, async (req, res) => {
-  try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Accesso negato' });
+// Import and use betting routes
+const betsRouter = require('./bets');
+app.use('/api/bets', authenticateToken, betsRouter);
+
+// Tips routes
+app.get('/api/tips', (req, res) => {
+  const tips = [
+    {
+      id: 1,
+      match: 'Inter vs Juventus',
+      prediction: 'Over 2.5 Goals',
+      odds: 1.85,
+      sport: 'football',
+      confidence: 'high',
+      author: 'Marco Betting',
+      event_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      status: 'pending'
+    },
+    {
+      id: 2,
+      match: 'Lakers vs Warriors',
+      prediction: 'Lakers -4.5',
+      odds: 1.92,
+      sport: 'basketball',
+      confidence: 'medium',
+      author: 'NBA Expert',
+      event_date: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+      status: 'pending'
+    },
+    {
+      id: 3,
+      match: 'Djokovic vs Nadal',
+      prediction: 'Djokovic to Win',
+      odds: 1.75,
+      sport: 'tennis',
+      confidence: 'high',
+      author: 'Tennis Pro',
+      event_date: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+      status: 'pending'
     }
-
-    const { title, description, category, end_date } = req.body;
-
-    if (!title || !end_date) {
-      return res.status(400).json({ error: 'Titolo e data di fine sono richiesti' });
-    }
-
-    const { data: prediction, error } = await supabase
-      .from('predictions')
-      .insert([
-        {
-          title,
-          description,
-          category,
-          end_date,
-          created_by: req.user.userId
-        }
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Errore creazione predizione:', error);
-      return res.status(500).json({ error: 'Errore creazione predizione' });
-    }
-
-    res.status(201).json(prediction);
-  } catch (error) {
-    console.error('Errore:', error);
-    res.status(500).json({ error: 'Errore interno del server' });
-  }
+  ];
+  
+  res.json({ success: true, tips });
 });
 
 // Health check
@@ -219,14 +173,9 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Avvia il server solo se non siamo in ambiente Vercel
-if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`✅ Server in ascolto sulla porta ${PORT}`);
-    console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
-  });
-}
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
-// Esporta l'app Express per Vercel
 module.exports = app;
