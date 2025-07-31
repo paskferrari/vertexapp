@@ -1,0 +1,18 @@
+{
+  "name": "vertex-unified",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd vertex && npm run dev",
+    "build": "cd vertex && npm run build",
+    "start": "cd vertex && npm run preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.53.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.0.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
