@@ -11,6 +11,7 @@ import { AuthProvider } from './context/AuthContext';
 // Components
 import Layout from './components/Layout';
 import GuestLayout from './components/GuestLayout';
+import RootRedirect from './components/RootRedirect';
 
 // Pages
 import LoginPage from './pages/LoginPage';
