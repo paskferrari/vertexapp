@@ -14,10 +14,12 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Fix: Gestione corretta per sviluppo e produzione
   const API_BASE_URL = import.meta.env.PROD 
     ? import.meta.env.VITE_API_BASE_URL || '/api'
     : '/api';
+    
+  console.log('API_BASE_URL:', API_BASE_URL);
+  console.log('Environment:', import.meta.env.PROD ? 'PRODUCTION' : 'DEVELOPMENT');
 
   useEffect(() => {
     // Check for existing token on app load
