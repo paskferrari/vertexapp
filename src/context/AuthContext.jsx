@@ -126,6 +126,8 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
+      console.log('Attempting activation for:', email);
+      
       // Verifica il codice di attivazione
       const { data: request, error: requestError } = await supabase
         .from('pre_registration_requests')
@@ -135,11 +137,15 @@ export const AuthProvider = ({ children }) => {
         .eq('status', 'approved')
         .single();
       
+      console.log('Request found:', request);
+      console.log('Request error:', requestError);
+      
       if (requestError || !request) {
         return { success: false, error: 'Codice di attivazione non valido o scaduto.' };
       }
       
       // Crea l'account in Supabase Auth con la password dell'utente
+      console.log('Creating auth user for:', request.email);
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: request.email,
         password: password, // ✅ Password scelta dall'utente
@@ -151,9 +157,15 @@ export const AuthProvider = ({ children }) => {
         }
       });
       
+      console.log('Auth data:', authData);
+      console.log('Auth error:', authError);
+      
       if (authError) {
-        console.error('Supabase auth error:', authError);
-        return { success: false, error: 'Errore durante la creazione dell\'account.' };
+        console.error('Supabase auth error details:', authError);
+        return { 
+          success: false, 
+          error: `Errore Supabase: ${authError.message}` 
+        };
       }
       
       // Segna la richiesta come completata
@@ -198,4 +210,48 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+
+const activateAccount = async (activationCode, password) => {
+  try {
+    console.log('🔍 Inizio attivazione con codice:', activationCode);
+    console.log('📧 Email da attivare:', email);
+    
+    // Verifica il codice nella tabella pre_registration_requests
+    const { data: requestData, error: requestError } = await supabase
+      .from('pre_registration_requests')
+      .select('*')
+      .eq('activation_code', activationCode)
+      .eq('status', 'pending')
+      .single();
+
+    if (requestError) {
+      console.error('❌ Errore verifica codice:', requestError);
+      throw new Error('Codice di attivazione non valido o già utilizzato');
+    }
+
+    console.log('✅ Richiesta trovata:', requestData);
+    
+    // Crea l'account in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: requestData.email,
+      password: password,
+      options: {
+        emailRedirectTo: undefined // Disabilita redirect email
+      }
+    });
+
+    if (authError) {
+      console.error('❌ Errore creazione account:', authError);
+      throw authError;
+    }
+
+    console.log('✅ Account creato:', authData);
+    
+    // ... resto del codice esistente ...
+  } catch (error) {
+    console.error('❌ Errore completo attivazione:', error);
+    throw error;
+  }
 };

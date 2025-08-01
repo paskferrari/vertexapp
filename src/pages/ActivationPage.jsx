@@ -14,15 +14,27 @@ const ActivationPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return emailRegex.test(email);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (formData.password !== formData.confirmPassword) {
-      setError('Le password non coincidono');
+    // Validazione email
+    if (!validateEmail(email)) {
+      setError('Formato email non valido');
       return;
     }
     
-    if (formData.password.length < 6) {
+    // Validazione password
+    if (password !== confirmPassword) {
+      setError('Le password non corrispondono');
+      return;
+    }
+    
+    if (password.length < 6) {
       setError('La password deve essere di almeno 6 caratteri');
       return;
     }
