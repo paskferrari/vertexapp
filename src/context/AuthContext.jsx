@@ -121,7 +121,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Attivazione account con codice
-  const activateAccount = async (email, activationCode) => {
+  // Nella funzione activateAccount, modifica la riga della password:
+  const activateAccount = async (email, activationCode, password) => {
     try {
       setLoading(true);
       
@@ -138,10 +139,10 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: 'Codice di attivazione non valido o scaduto.' };
       }
       
-      // Crea l'account in Supabase Auth
+      // Crea l'account in Supabase Auth con la password dell'utente
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: request.email,
-        password: 'temp_password_' + Date.now(), // ❌ Password temporanea!
+        password: password, // ✅ Password scelta dall'utente
         options: {
           data: {
             role: request.role || 'user',
@@ -166,7 +167,7 @@ export const AuthProvider = ({ children }) => {
       
       return { 
         success: true, 
-        message: 'Account attivato! Ora puoi fare login.',
+        message: 'Account attivato con successo! Ora puoi fare login con la tua password.',
         userData: {
           email: request.email,
           name: request.name,

@@ -6,7 +6,7 @@ const ActivationPage = () => {
   const { activateAccount } = useAuth();
   const [formData, setFormData] = useState({ 
     email: '', 
-    activationCode: '', 
+    activationCode: '',
     password: '',
     confirmPassword: ''
   });
@@ -34,12 +34,12 @@ const ActivationPage = () => {
     const result = await activateAccount(
       formData.email, 
       formData.activationCode,
-      formData.password // ✅ Password scelta dall'utente
+      formData.password
     );
     
     if (result.success) {
       setMessage(result.message);
-      setFormData({ email: '', activationCode: '' });
+      setFormData({ email: '', activationCode: '', password: '', confirmPassword: '' });
     } else {
       setError(result.error);
     }
@@ -59,7 +59,7 @@ const ActivationPage = () => {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-white mb-2">Attiva Account</h2>
-          <p className="text-gray-400">Inserisci il codice di attivazione ricevuto</p>
+          <p className="text-gray-400">Inserisci il codice di attivazione e scegli una password</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -90,6 +90,38 @@ const ActivationPage = () => {
               required
               className="w-full px-3 py-2 bg-dark-lighter border border-gray-600 rounded-lg text-white focus:outline-none focus:border-primary"
               placeholder="Inserisci il codice ricevuto"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Password
+            </label>
+            <input
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              required
+              minLength={6}
+              className="w-full px-3 py-2 bg-dark-lighter border border-gray-600 rounded-lg text-white focus:outline-none focus:border-primary"
+              placeholder="Scegli una password (min 6 caratteri)"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Conferma Password
+            </label>
+            <input
+              type="password"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleInputChange}
+              required
+              minLength={6}
+              className="w-full px-3 py-2 bg-dark-lighter border border-gray-600 rounded-lg text-white focus:outline-none focus:border-primary"
+              placeholder="Conferma la password"
             />
           </div>
           
