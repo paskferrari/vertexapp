@@ -16,15 +16,31 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Controlla la sessione attuale di Supabase
+    // Controlla la sessione corrente
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email,
+          role: session.user.user_metadata?.role || 'user',
+          name: session.user.user_metadata?.name || session.user.email.split('@')[0]
+        });
+      }
+      setLoading(false);
+    };
+
+    getSession();
+
+    // Ascolta i cambiamenti di autenticazione
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (session) {
           setUser({
             id: session.user.id,
             email: session.user.email,
-            role: session.user.user_metadata.role || 'user',
-            name: session.user.user_metadata.name || session.user.email.split('@')[0]
+            role: session.user.user_metadata?.role || 'user',
+            name: session.user.user_metadata?.name || session.user.email.split('@')[0]
           });
         } else {
           setUser(null);
@@ -33,25 +49,7 @@ export const AuthProvider = ({ children }) => {
       }
     );
 
-    // Controlla se c'è già una sessione attiva
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUser({
-          id: session.user.id,
-          email: session.user.email,
-          role: session.user.user_metadata.role || 'user',
-          name: session.user.user_metadata.name || session.user.email.split('@')[0]
-        });
-      }
-      setLoading(false);
-    };
-
-    checkUser();
-
-    return () => {
-      subscription?.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email, password) => {
@@ -59,31 +57,59 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password
       });
-
+      
       if (error) throw error;
-
+      
       return { success: true, user: data.user };
     } catch (error) {
       console.error('Login error:', error);
-      let errorMessage = error.message;
+      return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async (email, name, message) => {
+    try {
+      setLoading(true);
       
-      if (error.message.includes('Invalid login credentials')) {
-        errorMessage = 'Credenziali non valide';
-      } else if (error.message.includes('Email not confirmed')) {
-        errorMessage = 'Email non confermata. Controlla la tua casella di posta.';
-      }
+      // Inserisci richiesta di pre-registrazione
+      const { data, error } = await supabase
+        .from('pre_registration_requests')
+        .insert({
+          email,
+          name,
+          message,
+          role: 'user', // Default user
+          status: 'pending'
+        })
+        .select()
+        .single();
       
-      return { success: false, error: errorMessage };
+      if (error) throw error;
+      
+      return { 
+        success: true, 
+        message: 'Richiesta di registrazione inviata! Attendi l\'approvazione dell\'amministratore.' 
+      };
+    } catch (error) {
+      console.error('Registration error:', error);
+      return { success: false, error: error.message };
     } finally {
       setLoading(false);
     }
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const isAdmin = () => {
@@ -91,53 +117,65 @@ export const AuthProvider = ({ children }) => {
   };
 
   const getAuthHeaders = () => {
-    return {}; // Supabase gestisce automaticamente i token nelle richieste
+    return {}; // Non più necessario con Supabase
   };
 
-  // Dopo la registrazione, assicurati che la sessione sia impostata correttamente
-  const register = async (email, password) => {
+  // Attivazione account con codice
+  const activateAccount = async (email, activationCode) => {
     try {
       setLoading(true);
       
-      // Registrazione con Supabase
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
+      // Verifica il codice di attivazione
+      const { data: request, error: requestError } = await supabase
+        .from('pre_registration_requests')
+        .select('*')
+        .eq('email', email)
+        .eq('activation_code', activationCode)
+        .eq('status', 'approved')
+        .single();
+      
+      if (requestError || !request) {
+        return { success: false, error: 'Codice di attivazione non valido o scaduto.' };
+      }
+      
+      // Crea l'account in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: request.email,
+        password: 'temp_password_' + Date.now(),
         options: {
           data: {
-            role: 'user',
-            name: email.split('@')[0]
+            role: request.role || 'user',
+            name: request.name
           }
         }
       });
-  
-      if (error) throw error;
       
-      // Verifica se c'è una sessione e imposta l'utente
-      if (data.session) {
-        // Imposta esplicitamente l'utente qui per assicurarti che sia disponibile subito
-        setUser({
-          id: data.user.id,
-          email: data.user.email,
-          role: data.user.user_metadata.role || 'user',
-          name: data.user.user_metadata.name || data.user.email.split('@')[0]
-        });
+      if (authError) {
+        console.error('Supabase auth error:', authError);
+        return { success: false, error: 'Errore durante la creazione dell\'account.' };
       }
+      
+      // Segna la richiesta come completata
+      await supabase
+        .from('pre_registration_requests')
+        .update({ 
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', request.id);
       
       return { 
         success: true, 
-        user: data.user,
-        message: data.session ? 'Registrazione completata' : 'Controlla la tua email per verificare l\'account'
+        message: 'Account attivato! Ora puoi fare login.',
+        userData: {
+          email: request.email,
+          name: request.name,
+          role: request.role || 'user'
+        }
       };
     } catch (error) {
-      console.error('Registration error:', error);
-      let errorMessage = error.message;
-      
-      if (error.message.includes('already registered')) {
-        errorMessage = 'Email già registrata';
-      }
-      
-      return { success: false, error: errorMessage };
+      console.error('Activation error:', error);
+      return { success: false, error: 'Errore durante l\'attivazione dell\'account.' };
     } finally {
       setLoading(false);
     }
@@ -150,7 +188,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     isAdmin,
-    getAuthHeaders
+    getAuthHeaders,
+    activateAccount
   };
 
   return (

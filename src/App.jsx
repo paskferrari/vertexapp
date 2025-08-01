@@ -28,6 +28,8 @@ import Predictions from './pages/Predictions';
 import Notifications from './pages/Notifications';
 import UsersAdmin from './pages/UsersAdmin';
 import RegisterPage from './pages/RegisterPage';
+import ActivationPage from './pages/ActivationPage';
+import RegistrationRequests from './pages/RegistrationRequests';
 
 // Routes
 import PrivateRoute from './routes/PrivateRoute';
@@ -71,17 +73,35 @@ function App() {
             <Route path="/roi" element={<ROIPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/predictions" element={<Predictions />} />
+            // Pannello principale admin
             <Route path="/admin" element={
               <AdminRoute>
                 <AdminPanel />
               </AdminRoute>
             } />
-            <Route path="/notifications" element={<Notifications />} />
+            
+            // Gestione utenti
             <Route path="/admin/users" element={
               <AdminRoute>
                 <UsersAdmin />
               </AdminRoute>
             } />
+            
+            // Richieste di registrazione
+            <Route path="/admin/registration-requests" element={<RegistrationRequests />} />
+            <Route path="/notifications" element={<Notifications />} />
+            // Aggiungi queste rotte nella sezione pubblica
+            <Route path="/activate" element={<ActivationPage />} />
+            
+            // Nella sezione delle rotte:
+            <Route 
+              path="/admin/registration-requests" 
+              element={
+                <AdminRoute>
+                  <RegistrationRequests />
+                </AdminRoute>
+              } 
+            />
           </Route>
         </Route>
         
