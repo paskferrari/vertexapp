@@ -125,9 +125,17 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      console.log('Attempting activation for:', email);
+      // Validazione email lato client
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return { success: false, error: 'Formato email non valido' };
+      }
+      
+      // Pulisci l'email da eventuali spazi
+      const cleanEmail = email.trim().toLowerCase();
+      
+      console.log('Attempting activation for:', cleanEmail);
       console.log('Activation code:', activationCode);
-      console.log('Password length:', password?.length);
       
       // Debug: vedi tutte le richieste per questa email
       const { data: allRequests, error: debugError } = await supabase
@@ -147,7 +155,7 @@ export const AuthProvider = ({ children }) => {
       const { data: request, error: requestError } = await supabase
         .from('pre_registration_requests')
         .select('*')
-        .eq('email', email)
+        .eq('email', cleanEmail)
         .eq('activation_code', activationCode)
         .eq('status', 'approved')
         .single();
@@ -179,14 +187,14 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: 'Codice di attivazione non valido o scaduto.' };
       }
       
-      // Prima prova il login se l'account esiste già
+      // Prova prima il login (account potrebbe già esistere)
       const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-        email: request.email,
+        email: cleanEmail,
         password: password
       });
       
-      if (loginData && !loginError) {
-        // Login riuscito, segna come completato
+      if (loginData?.user && !loginError) {
+        // Login riuscito
         await supabase
           .from('pre_registration_requests')
           .update({ 
@@ -206,60 +214,45 @@ export const AuthProvider = ({ children }) => {
         };
       }
       
-      // Se il login fallisce, prova a creare l'account
-      console.log('Creating auth user for:', request.email);
+      // Se login fallisce, crea nuovo account
+      console.log('Creating new auth user for:', cleanEmail);
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: request.email,
-        password: password, // Password scelta dall'utente
+        email: cleanEmail,
+        password: password,
         options: {
           data: {
             role: request.role || 'user',
             name: request.name
-          }
+          },
+          emailRedirectTo: undefined // Disabilita email di conferma
         }
       });
       
-      console.log('Auth data:', authData);
-      console.log('Auth error:', authError);
-      
       if (authError) {
-        console.error('Supabase auth error details:', authError);
+        console.error('Supabase auth error:', authError);
         
-        // Se l'email esiste già, prova il login
-        if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
-          const { data: retryLoginData, error: retryLoginError } = await supabase.auth.signInWithPassword({
-            email: request.email,
-            password: password
-          });
-          
-          if (retryLoginData && !retryLoginError) {
-            await supabase
-              .from('pre_registration_requests')
-              .update({ 
-                status: 'completed',
-                completed_at: new Date().toISOString()
-              })
-              .eq('id', request.id);
-              
-            return { 
-              success: true, 
-              message: 'Account già esistente. Login effettuato con successo!',
-              userData: {
-                email: request.email,
-                name: request.name,
-                role: request.role || 'user'
-              }
-            };
-          }
+        // Gestisci errori specifici
+        if (authError.message.includes('invalid') && authError.message.includes('email')) {
+          return { 
+            success: false, 
+            error: 'Email non valida. Verifica la configurazione di Supabase o prova con un\'email diversa.' 
+          };
+        }
+        
+        if (authError.message.includes('already registered')) {
+          return { 
+            success: false, 
+            error: 'Account già esistente. Prova a fare login direttamente.' 
+          };
         }
         
         return { 
           success: false, 
-          error: `Errore Supabase: ${authError.message}` 
+          error: `Errore di autenticazione: ${authError.message}` 
         };
       }
       
-      // Segna la richiesta come completata
+      // Successo - segna come completato
       await supabase
         .from('pre_registration_requests')
         .update({ 
@@ -270,13 +263,14 @@ export const AuthProvider = ({ children }) => {
       
       return { 
         success: true, 
-        message: 'Account attivato con successo! Ora puoi fare login con la tua password.',
+        message: 'Account attivato con successo!',
         userData: {
           email: request.email,
           name: request.name,
           role: request.role || 'user'
         }
       };
+      
     } catch (error) {
       console.error('Activation error:', error);
       return { success: false, error: 'Errore durante l\'attivazione dell\'account.' };
