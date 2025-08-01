@@ -23,18 +23,18 @@ const ActivationPage = () => {
     e.preventDefault();
     
     // Validazione email
-    if (!validateEmail(email)) {
+    if (!validateEmail(formData.email)) {
       setError('Formato email non valido');
       return;
     }
     
     // Validazione password
-    if (password !== confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       setError('Le password non corrispondono');
       return;
     }
     
-    if (password.length < 6) {
+    if (formData.password.length < 6) {
       setError('La password deve essere di almeno 6 caratteri');
       return;
     }
@@ -42,7 +42,7 @@ const ActivationPage = () => {
     setLoading(true);
     setError('');
     setMessage('');
-
+  
     const result = await activateAccount(
       formData.email, 
       formData.activationCode,
