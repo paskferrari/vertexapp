@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import bcrypt from 'bcryptjs'; // Importa bcrypt
 
 const AuthContext = createContext();
 
@@ -54,30 +55,41 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
+  // Aggiungi scadenza alla sessione utente
   const login = async (email, password) => {
     try {
       setLoading(true);
       
       const cleanEmail = email.trim().toLowerCase();
       
-      // Verifica credenziali nella tabella users
+      // Ottieni l'utente dal database
       const { data: userData, error } = await supabase
         .from('users')
         .select('*')
         .eq('email', cleanEmail)
-        .eq('password', password) // In produzione, usa hash comparison!
         .single();
       
       if (error || !userData) {
         return { success: false, error: 'Email o password non corretti.' };
       }
       
+      // Verifica la password con bcrypt
+      const passwordMatch = await bcrypt.compare(password, userData.password);
+      if (!passwordMatch) {
+        return { success: false, error: 'Email o password non corretti.' };
+      }
+      
       // Imposta l'utente come autenticato
+      // Aggiungi scadenza alla sessione (24 ore)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+      
       const userSession = {
         id: userData.id,
         email: userData.email,
         name: userData.name,
-        role: userData.role
+        role: userData.role,
+        expiresAt: expiresAt.toISOString()
       };
       
       setUser(userSession);
@@ -185,6 +197,10 @@ export const AuthProvider = ({ children }) => {
         .eq('email', cleanEmail)
         .single();
 
+      // Hash della password prima di salvarla
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
       let userData;
 
       if (existingUser) {
@@ -192,7 +208,7 @@ export const AuthProvider = ({ children }) => {
         const { data: updatedUser, error: updateError } = await supabase
           .from('users')
           .update({ 
-            password: password, // In produzione, hash questa password!
+            password: hashedPassword, // Password hashata
             name: request.name,
             updated_at: new Date().toISOString()
           })
@@ -213,7 +229,7 @@ export const AuthProvider = ({ children }) => {
           .insert({
             email: cleanEmail,
             name: request.name,
-            password: password, // In produzione, hash questa password!
+            password: hashedPassword, // Password hashata
             role: request.role || 'user',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -299,4 +315,33 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+// Verifica scadenza sessione all'avvio
+useEffect(() => {
+  const savedUser = localStorage.getItem('vertex_user');
+  if (savedUser) {
+    try {
+      const parsedUser = JSON.parse(savedUser);
+      
+      // Verifica se la sessione è scaduta
+      if (parsedUser.expiresAt) {
+        const expiresAt = new Date(parsedUser.expiresAt);
+        if (expiresAt < new Date()) {
+          // Sessione scaduta, logout
+          console.log('Session expired, logging out');
+          localStorage.removeItem('vertex_user');
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+      }
+      
+      setUser(parsedUser);
+    } catch (error) {
+      console.error('Error parsing saved user:', error);
+      localStorage.removeItem('vertex_user');
+    }
+  }
+  setLoading(false);
+}, []);
 

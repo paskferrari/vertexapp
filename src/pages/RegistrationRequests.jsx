@@ -28,20 +28,28 @@ const RegistrationRequests = () => {
   };
 
   const generateActivationCode = () => {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    // Genera un codice più sicuro usando crypto
+    const array = new Uint8Array(16);
+    window.crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   };
 
   const approveRequest = async (requestId, assignedRole = 'user') => {
     try {
       const activationCode = generateActivationCode();
       
+      // Imposta scadenza a 24 ore da ora
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+      
       const { error } = await supabase
         .from('pre_registration_requests')
         .update({
           status: 'approved',
           activation_code: activationCode,
+          activation_code_expires_at: expiresAt.toISOString(),
           approved_at: new Date().toISOString(),
-          approved_by: user?.email || 'admin', // USA user?.email con fallback
+          approved_by: user?.email || 'admin',
           role: assignedRole
         })
         .eq('id', requestId);
