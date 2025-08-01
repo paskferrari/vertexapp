@@ -129,6 +129,20 @@ export const AuthProvider = ({ children }) => {
       console.log('Activation code:', activationCode);
       console.log('Password length:', password?.length);
       
+      // Debug: vedi tutte le richieste per questa email
+      const { data: allRequests, error: debugError } = await supabase
+        .from('pre_registration_requests')
+        .select('*')
+        .eq('email', email);
+      
+      console.log('All requests for email:', allRequests);
+      console.log('Debug error:', debugError);
+      
+      if (debugError) {
+        console.error('Debug query error:', debugError);
+        return { success: false, error: 'Errore durante la verifica delle richieste di registrazione' };
+      }
+      
       // Verifica il codice di attivazione
       const { data: request, error: requestError } = await supabase
         .from('pre_registration_requests')
@@ -143,7 +157,25 @@ export const AuthProvider = ({ children }) => {
       console.log('Request error:', requestError);
       console.log('Request error details:', JSON.stringify(requestError, null, 2));
       
-      if (requestError || !request) {
+      if (requestError) {
+        console.error('Request verification error:', requestError);
+        // Controlla casi di errore specifici
+        if (requestError.code === 'PGRST116') {
+          const activeRequest = allRequests?.find(req => req.email === email);
+          if (!activeRequest) {
+            return { success: false, error: 'Nessuna richiesta di registrazione trovata per questa email' };
+          }
+          if (activeRequest.status !== 'approved') {
+            return { success: false, error: 'La richiesta di registrazione non è ancora stata approvata' };
+          }
+          if (activeRequest.activation_code !== activationCode) {
+            return { success: false, error: 'Codice di attivazione non valido' };
+          }
+        }
+        return { success: false, error: 'Codice di attivazione non valido o scaduto' };
+      }
+      
+      if (!request) {
         return { success: false, error: 'Codice di attivazione non valido o scaduto.' };
       }
       
@@ -214,3 +246,4 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
