@@ -216,7 +216,6 @@ export const AuthProvider = ({ children }) => {
 const activateAccount = async (activationCode, password) => {
   try {
     console.log('🔍 Inizio attivazione con codice:', activationCode);
-    console.log('📧 Email da attivare:', email);
     
     // Verifica il codice nella tabella pre_registration_requests
     const { data: requestData, error: requestError } = await supabase
@@ -232,13 +231,14 @@ const activateAccount = async (activationCode, password) => {
     }
 
     console.log('✅ Richiesta trovata:', requestData);
+    console.log('📧 Email da attivare:', requestData.email); // Usa requestData.email
     
     // Crea l'account in Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: requestData.email,
+      email: requestData.email, // Usa requestData.email invece di email
       password: password,
       options: {
-        emailRedirectTo: undefined // Disabilita redirect email
+        emailRedirectTo: undefined
       }
     });
 
@@ -249,7 +249,36 @@ const activateAccount = async (activationCode, password) => {
 
     console.log('✅ Account creato:', authData);
     
-    // ... resto del codice esistente ...
+    // Aggiorna lo stato della richiesta
+    const { error: updateError } = await supabase
+      .from('pre_registration_requests')
+      .update({ 
+        status: 'completed',
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', requestData.id);
+
+    if (updateError) {
+      console.error('❌ Errore aggiornamento stato:', updateError);
+      throw updateError;
+    }
+
+    // Login automatico dopo attivazione
+    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+      email: requestData.email, // Usa requestData.email
+      password: password
+    });
+
+    if (loginError) {
+      console.error('❌ Errore login automatico:', loginError);
+      throw loginError;
+    }
+
+    setUser(loginData.user);
+    console.log('✅ Attivazione completata e login effettuato');
+    
+    return { success: true, user: loginData.user };
+    
   } catch (error) {
     console.error('❌ Errore completo attivazione:', error);
     throw error;
