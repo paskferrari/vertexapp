@@ -4,18 +4,38 @@ import { useAuth } from '../context/AuthContext';
 
 const ActivationPage = () => {
   const { activateAccount } = useAuth();
-  const [formData, setFormData] = useState({ email: '', activationCode: '' });
+  const [formData, setFormData] = useState({ 
+    email: '', 
+    activationCode: '', 
+    password: '',
+    confirmPassword: ''
+  });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (formData.password !== formData.confirmPassword) {
+      setError('Le password non coincidono');
+      return;
+    }
+    
+    if (formData.password.length < 6) {
+      setError('La password deve essere di almeno 6 caratteri');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     setMessage('');
 
-    const result = await activateAccount(formData.email, formData.activationCode);
+    const result = await activateAccount(
+      formData.email, 
+      formData.activationCode,
+      formData.password // ✅ Password scelta dall'utente
+    );
     
     if (result.success) {
       setMessage(result.message);

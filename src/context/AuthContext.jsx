@@ -141,7 +141,7 @@ export const AuthProvider = ({ children }) => {
       // Crea l'account in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: request.email,
-        password: 'temp_password_' + Date.now(),
+        password: 'temp_password_' + Date.now(), // ❌ Password temporanea!
         options: {
           data: {
             role: request.role || 'user',
