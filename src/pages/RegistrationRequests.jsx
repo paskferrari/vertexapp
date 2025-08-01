@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { useAuth } from '../context/AuthContext'; // QUESTA RIGA
 
 const RegistrationRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth(); // QUESTA RIGA È FONDAMENTALE
 
   useEffect(() => {
     fetchRequests();
@@ -39,8 +41,8 @@ const RegistrationRequests = () => {
           status: 'approved',
           activation_code: activationCode,
           approved_at: new Date().toISOString(),
-          approved_by: user?.email || 'admin', // Usa l'email dell'admin loggato
-          role: assignedRole // Assegna il ruolo
+          approved_by: user?.email || 'admin', // USA user?.email con fallback
+          role: assignedRole
         })
         .eq('id', requestId);
       
@@ -60,7 +62,10 @@ const RegistrationRequests = () => {
     try {
       const { error } = await supabase
         .from('pre_registration_requests')
-        .update({ status: 'rejected' })
+        .update({ 
+          status: 'rejected',
+          approved_by: user?.email || 'admin' // USA user?.email con fallback
+        })
         .eq('id', requestId);
       
       if (error) throw error;
@@ -81,94 +86,129 @@ const RegistrationRequests = () => {
     }
   };
 
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pending': return 'In Attesa';
+      case 'approved': return 'Approvata';
+      case 'completed': return 'Completata';
+      case 'rejected': return 'Rifiutata';
+      default: return status;
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white">Caricamento...</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-white">Richieste di Registrazione</h1>
-        <button 
-          onClick={fetchRequests}
-          className="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg"
-        >
-          Aggiorna
-        </button>
-      </div>
-      
-      <div className="bg-dark-lighter rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-dark border-b border-gray-600">
-              <tr>
-                <th className="px-6 py-3 text-left text-white">Nome</th>
-                <th className="px-6 py-3 text-left text-white">Email</th>
-                <th className="px-6 py-3 text-left text-white">Stato</th>
-                <th className="px-6 py-3 text-left text-white">Data Richiesta</th>
-                <th className="px-6 py-3 text-left text-white">Codice Attivazione</th>
-                <th className="px-6 py-3 text-left text-white">Azioni</th>
-              </tr>
-            </thead>
-            <tbody>
-              {requests.map((request) => (
-                <tr key={request.id} className="border-b border-gray-600 hover:bg-dark/50">
-                  <td className="px-6 py-4 text-gray-300 font-medium">{request.name}</td>
-                  <td className="px-6 py-4 text-gray-300">{request.email}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}>
-                      {request.status.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-300 text-sm">
-                    {new Date(request.created_at).toLocaleString('it-IT')}
-                  </td>
-                  <td className="px-6 py-4">
-                    {request.activation_code ? (
-                      <code className="bg-dark px-2 py-1 rounded text-primary text-sm">
-                        {request.activation_code}
-                      </code>
-                    ) : (
-                      <span className="text-gray-500">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {request.status === 'pending' && (
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => approveRequest(request.id)}
-                          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
-                        >
-                          Approva
-                        </button>
-                        <button
-                          onClick={() => rejectRequest(request.id)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-medium transition-colors"
-                        >
-                          Rifiuta
-                        </button>
-                      </div>
-                    )}
-                    {request.status === 'approved' && (
-                      <span className="text-green-400 text-sm">In attesa di attivazione</span>
-                    )}
-                    {request.status === 'completed' && (
-                      <span className="text-blue-400 text-sm">Account attivato</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+    <div className="min-h-screen bg-gray-900 text-white p-6">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8">Richieste di Registrazione</h1>
         
-        {requests.length === 0 && (
-          <div className="text-center py-8 text-gray-400">
-            Nessuna richiesta di registrazione trovata.
+        {requests.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-400">Nessuna richiesta di registrazione trovata.</p>
+          </div>
+        ) : (
+          <div className="bg-gray-800 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Nome
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Stato
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Data
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Azioni
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {requests.map((request) => (
+                    <tr key={request.id} className="hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-white">
+                          {request.name}
+                        </div>
+                        {request.message && (
+                          <div className="text-sm text-gray-400 mt-1">
+                            {request.message}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {request.email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(request.status)}`}>
+                          {getStatusText(request.status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                        {new Date(request.created_at).toLocaleDateString('it-IT')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {request.status === 'pending' && (
+                          <div className="flex gap-2">
+                            <select 
+                              className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  approveRequest(request.id, e.target.value);
+                                  e.target.value = ''; // Reset selection
+                                }
+                              }}
+                              defaultValue=""
+                            >
+                              <option value="" disabled>Approva come...</option>
+                              <option value="user">Utente</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                            <button
+                              onClick={() => rejectRequest(request.id)}
+                              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                            >
+                              Rifiuta
+                            </button>
+                          </div>
+                        )}
+                        {request.status === 'approved' && (
+                          <div className="text-xs">
+                            <div className="text-green-400 mb-1">
+                              ✅ Approvata
+                            </div>
+                            {request.activation_code && (
+                              <div className="bg-green-900/30 p-2 rounded border border-green-500/30">
+                                <div className="text-green-300 font-semibold text-sm">Codice Attivazione:</div>
+                                <div className="text-green-100 font-mono text-sm bg-green-800/50 px-2 py-1 rounded mt-1">
+                                  {request.activation_code}
+                                </div>
+                                <div className="text-green-400 text-xs mt-1">
+                                  Fornisci questo codice all'utente
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -177,25 +217,3 @@ const RegistrationRequests = () => {
 };
 
 export default RegistrationRequests;
-
-// Nella parte del rendering, aggiungi un dropdown per selezionare il ruolo:
-<div className="flex gap-2">
-  <select 
-    className="px-3 py-1 border rounded"
-    onChange={(e) => {
-      const role = e.target.value;
-      approveRequest(request.id, role);
-    }}
-    defaultValue=""
-  >
-    <option value="" disabled>Approva come...</option>
-    <option value="user">Utente</option>
-    <option value="admin">Admin</option>
-  </select>
-  <button
-    onClick={() => rejectRequest(request.id)}
-    className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-  >
-    Rifiuta
-  </button>
-</div>
