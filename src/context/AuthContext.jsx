@@ -121,12 +121,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Attivazione account con codice
-  // Nella funzione activateAccount, modifica la riga della password:
   const activateAccount = async (email, activationCode, password) => {
     try {
       setLoading(true);
       
       console.log('Attempting activation for:', email);
+      console.log('Activation code:', activationCode);
+      console.log('Password length:', password?.length);
       
       // Verifica il codice di attivazione
       const { data: request, error: requestError } = await supabase
@@ -137,8 +138,10 @@ export const AuthProvider = ({ children }) => {
         .eq('status', 'approved')
         .single();
       
+      console.log('Query executed');
       console.log('Request found:', request);
       console.log('Request error:', requestError);
+      console.log('Request error details:', JSON.stringify(requestError, null, 2));
       
       if (requestError || !request) {
         return { success: false, error: 'Codice di attivazione non valido o scaduto.' };
@@ -148,7 +151,7 @@ export const AuthProvider = ({ children }) => {
       console.log('Creating auth user for:', request.email);
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: request.email,
-        password: password, // ✅ Password scelta dall'utente
+        password: password, // Password scelta dall'utente
         options: {
           data: {
             role: request.role || 'user',
