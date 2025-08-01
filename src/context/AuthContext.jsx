@@ -179,7 +179,34 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: 'Codice di attivazione non valido o scaduto.' };
       }
       
-      // Crea l'account in Supabase Auth con la password dell'utente
+      // Prima prova il login se l'account esiste già
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email: request.email,
+        password: password
+      });
+      
+      if (loginData && !loginError) {
+        // Login riuscito, segna come completato
+        await supabase
+          .from('pre_registration_requests')
+          .update({ 
+            status: 'completed',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', request.id);
+          
+        return { 
+          success: true, 
+          message: 'Login effettuato con successo!',
+          userData: {
+            email: request.email,
+            name: request.name,
+            role: request.role || 'user'
+          }
+        };
+      }
+      
+      // Se il login fallisce, prova a creare l'account
       console.log('Creating auth user for:', request.email);
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: request.email,
@@ -197,6 +224,35 @@ export const AuthProvider = ({ children }) => {
       
       if (authError) {
         console.error('Supabase auth error details:', authError);
+        
+        // Se l'email esiste già, prova il login
+        if (authError.message.includes('already registered') || authError.message.includes('already exists')) {
+          const { data: retryLoginData, error: retryLoginError } = await supabase.auth.signInWithPassword({
+            email: request.email,
+            password: password
+          });
+          
+          if (retryLoginData && !retryLoginError) {
+            await supabase
+              .from('pre_registration_requests')
+              .update({ 
+                status: 'completed',
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', request.id);
+              
+            return { 
+              success: true, 
+              message: 'Account già esistente. Login effettuato con successo!',
+              userData: {
+                email: request.email,
+                name: request.name,
+                role: request.role || 'user'
+              }
+            };
+          }
+        }
+        
         return { 
           success: false, 
           error: `Errore Supabase: ${authError.message}` 
